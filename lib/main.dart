@@ -23,6 +23,7 @@ Future<void> main() async {
   await app.library.load();
   await app.playlists.load();
   await app.player.init();
+  if (!Platform.isAndroid) app.bt.onConnected = app.player.reloadAudioOutput;
   if (Platform.isAndroid) {
     try {
       await AudioService.init(
@@ -84,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    app.player.notice.addListener(_showNotice);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await app.firstRunSetup();
       await _startupBluetooth();
@@ -96,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    app.player.notice.removeListener(_showNotice);
     super.dispose();
   }
 
@@ -108,6 +111,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       app.bt.refresh(app.settings.btDeviceId);
       _checkBluetoothReceived();
     }
+  }
+
+  void _showNotice() {
+    final msg = app.player.notice.value;
+    if (msg != null && mounted) toast(context, msg);
   }
 
   /// Gestione del Bluetooth all'apertura dell'app.

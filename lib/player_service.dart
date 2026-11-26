@@ -78,6 +78,8 @@ class PlayerService extends ChangeNotifier {
       notifyListeners();
     }));
 
+    _startWatchdog();
+
     // Salva periodicamente il punto di ascolto.
     _saveTimer = Timer.periodic(const Duration(seconds: 10), (_) => saveState());
 
@@ -229,17 +231,90 @@ class PlayerService extends ChangeNotifier {
       final gains = settings.eqGains;
       if (!settings.eqEnabled || gains.every((g) => g == 0)) {
         await n.setProperty('af', '');
+        await _setGain(0);
         return;
       }
-      final maxGain = gains.reduce((a, b) => a > b ? a : b);
+      // Solo il filtro "equalizer": il motore audio incluso non ha altri filtri.
       final parts = <String>[];
-      if (maxGain > 0) parts.add('volume=-${maxGain.toStringAsFixed(1)}dB');
       for (var i = 0; i < kEqBands.length; i++) {
         if (gains[i] == 0) continue;
         parts.add('equalizer=f=${kEqBands[i]}:t=o:w=1:g=${gains[i].toStringAsFixed(1)}');
       }
       await n.setProperty('af', 'lavfi=[${parts.join(',')}]');
+      // Abbassa un po' il volume quando si alzano le frequenze, per non distorcere.
+      final maxGain = gains.reduce((a, b) => a > b ? a : b);
+      await _setGain(maxGain > 0 ? -maxGain : 0);
     } catch (_) {}
+  }
+
+  Future<void> _setGain(double db) async {
+    try {
+      await _native?.setProperty('volume-gain', db.toStringAsFixed(1));
+    } catch (_) {}
+  }
+
+  /// Fa ripartire l'uscita audio (es. dopo il collegamento di cuffie o casse Bluetooth).
+  Future<void> reloadAudioOutput() async {
+    try {
+      await _native?.command(['ao-reload']);
+    } catch (_) {}
+  }
+
+  // ---- Controllo automatico: se il brano risulta in riproduzione ma resta fermo ----
+
+  final notice = ValueNotifier<String?>(null);
+  Timer? _watchdog;
+  Duration _lastPos = Duration.zero;
+  int _stuckTicks = 0;
+  int _repairStep = 0;
+
+  void _startWatchdog() {
+    _watchdog?.cancel();
+    _watchdog = Timer.periodic(const Duration(seconds: 2), (_) => _checkStuck());
+  }
+
+  Future<void> _checkStuck() async {
+    if (!playing || queue.isEmpty) {
+      _stuckTicks = 0;
+      _repairStep = 0;
+      return;
+    }
+    if (position != _lastPos) {
+      _lastPos = position;
+      _stuckTicks = 0;
+      _repairStep = 0;
+      return;
+    }
+    _stuckTicks++;
+    if (_stuckTicks < 2) return; // fermo da circa 4 secondi
+    _stuckTicks = 0;
+    final at = position;
+    switch (_repairStep++) {
+      case 0:
+        // 1) Riavvia l'uscita audio (dispositivo Bluetooth cambiato o scollegato).
+        await reloadAudioOutput();
+        await player.seek(at);
+      case 1:
+        // 2) Se l'equalizzatore blocca l'audio, lo disattiva.
+        if (settings.eqEnabled) {
+          settings.eqEnabled = false;
+          await settings.save();
+          await applyEq();
+          notice.value = null;
+          notice.value = 'L\'equalizzatore bloccava l\'audio ed è stato disattivato';
+        }
+        await player.seek(at);
+      case 2:
+        // 3) Riapre il brano.
+        final i = index;
+        await player.jump(i < 0 ? 0 : i);
+        await player.play();
+      default:
+        notice.value = null;
+        notice.value = 'Questo brano non si riesce a riprodurre: passo al successivo';
+        _repairStep = 0;
+        await player.next();
+    }
   }
 
   // ---- Timer di spegnimento ----
@@ -274,6 +349,7 @@ class PlayerService extends ChangeNotifier {
     }
     _sleepTimer?.cancel();
     _saveTimer?.cancel();
+    _watchdog?.cancel();
     player.dispose();
     super.dispose();
   }

@@ -190,7 +190,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             const _Header('Informazioni', Icons.info_outline),
             const ListTile(
-              title: Text('SirJoe Player 1.0.1'),
+              title: Text('SirJoe Player 1.0.2'),
               subtitle: Text('Lettore musicale con playlist, equalizzatore e Bluetooth automatico'),
             ),
             ListTile(
