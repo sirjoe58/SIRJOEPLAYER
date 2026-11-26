@@ -4,6 +4,7 @@ import '../app_state.dart';
 import '../library.dart';
 import '../models.dart';
 import 'common.dart';
+import 'edit_tags.dart';
 import 'import_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -93,7 +94,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: PlayButtonsRow(tracks: tracks)),
+            Expanded(
+              child: PlayButtonsRow(
+                tracks: tracks,
+                extra: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CatalogScreen())),
+                  icon: const Icon(Icons.label),
+                  label: const Text('Cataloga'),
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Text('${tracks.length} brani'),
@@ -115,6 +125,41 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Widget _groupList(Map<String, List<Track>> groups) {
     final keys = groups.keys.toList();
+    final onlyUnknown = keys.length <= 1 && (keys.isEmpty || keys.first.endsWith('sconosciuto') || catalog == Catalog.genere);
+    if (onlyUnknown && catalog != Catalog.cartella) {
+      return ListView(children: [
+        Card(
+          margin: const EdgeInsets.all(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                'I tuoi brani non contengono ${catalog == Catalog.genere ? 'il genere' : catalog == Catalog.album ? 'l\'album' : 'l\'artista'} '
+                '(capita spesso con i brani scaricati da YouTube).',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              const Text('Con "Cataloga" scegli più brani insieme e assegni artista, album o genere in un colpo solo.'),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CatalogScreen())),
+                icon: const Icon(Icons.label),
+                label: const Text('Cataloga i brani'),
+              ),
+            ]),
+          ),
+        ),
+        for (final k in keys)
+          ListTile(
+            leading: const CircleAvatar(child: Icon(Icons.music_note)),
+            title: Text(k),
+            subtitle: Text('${groups[k]!.length} brani'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => GroupScreen(title: k, catalog: catalog),
+            )),
+          ),
+      ]);
+    }
     final icon = switch (catalog) {
       Catalog.artista => Icons.person,
       Catalog.genere => Icons.category,
@@ -204,7 +249,18 @@ class GroupScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(title: Text(title), actions: [
+        TextButton.icon(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => CatalogScreen(
+              only: app.library.groups(catalog)[title] ?? [],
+              title: 'Modifica: $title',
+            ),
+          )),
+          icon: const Icon(Icons.edit),
+          label: const Text('Modifica'),
+        ),
+      ]),
       body: ListenableBuilder(
         listenable: app.library,
         builder: (context, _) {

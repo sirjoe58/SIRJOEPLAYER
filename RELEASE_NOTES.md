@@ -10,6 +10,7 @@ Lettore musicale semplice con playlist, equalizzatore e collegamento Bluetooth a
 ### Funzioni
 - Legge MP3, FLAC, WAV, OGG, OPUS, M4A/AAC, ALAC, WMA, APE, AIFF, DSD e molti altri formati
 - Libreria catalogata per **Titolo, Artista, Genere, Album e Cartella**, con ricerca
+- **Cataloga**: assegni artista, album e genere a più brani insieme; per i brani da YouTube puoi prendere l'artista dal titolo. I titoli vengono ripuliti (Official Video, [4K], codici)
 - Playlist salvabili: crea, rinomina, riordina, ordina, importa ed esporta (M3U), salva la coda
 - Equalizzatore a 10 bande con impostazioni pronte, velocità, timer di spegnimento, ReplayGain, gapless
 - Riprende da dove avevi lasciato

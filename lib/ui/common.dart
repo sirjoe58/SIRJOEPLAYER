@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models.dart';
+import 'edit_tags.dart';
 import 'now_playing.dart';
 
 void toast(BuildContext context, String msg, {SnackBarAction? action}) {
@@ -197,6 +198,8 @@ class TrackTile extends StatelessWidget {
                       addToPlaylistDialog(context, [track.path]);
                     case 'info':
                       showTrackInfo(context, track);
+                    case 'edit':
+                      editTrackDialog(context, track);
                     default:
                       onExtra?.call(a);
                   }
@@ -205,6 +208,7 @@ class TrackTile extends StatelessWidget {
                   const PopupMenuItem(value: 'next', child: ListTile(leading: Icon(Icons.playlist_play), title: Text('Riproduci dopo'))),
                   const PopupMenuItem(value: 'queue', child: ListTile(leading: Icon(Icons.queue), title: Text('Aggiungi alla coda'))),
                   const PopupMenuItem(value: 'playlist', child: ListTile(leading: Icon(Icons.playlist_add), title: Text('Aggiungi a playlist'))),
+                  const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit), title: Text('Modifica artista, genere, album'))),
                   const PopupMenuItem(value: 'info', child: ListTile(leading: Icon(Icons.info_outline), title: Text('Informazioni'))),
                   ...extraItems,
                 ],

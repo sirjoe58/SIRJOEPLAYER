@@ -10,6 +10,26 @@ import 'package:path_provider/path_provider.dart';
 
 import 'models.dart';
 
+// Funzioni di primo livello: la closure passata all'isolate deve contenere solo
+// dati semplici (se catturasse la Libreria, l'isolate darebbe errore).
+Future<List<Map<String, dynamic>>> _readTagsAsync(List<String> paths) =>
+    Isolate.run(() => _readTags(paths));
+
+Future<Uint8List?> _readCoverAsync(String path) => Isolate.run(() => _readCover(path));
+
+final _junkInBrackets = RegExp(
+  r'\s*[\(\[][^\)\]]*(official|video|lyric|audio|4k|hd\b|hq\b|visuali[sz]er|remaster|videoclip|testo)[^\)\]]*[\)\]]',
+  caseSensitive: false,
+);
+final _youtubeId = RegExp(r'\s*\[[A-Za-z0-9_-]{11}\]');
+
+/// Toglie dal titolo le scritte inutili dei video (Official Video, [4K], codici YouTube...).
+String cleanTitle(String s) {
+  var t = s.replaceAll(_youtubeId, '').replaceAll(_junkInBrackets, '');
+  t = t.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+  return t.isEmpty ? s.trim() : t;
+}
+
 /// Legge i tag di una lista di file (eseguito in un isolate separato).
 List<Map<String, dynamic>> _readTags(List<String> paths) {
   final out = <Map<String, dynamic>>[];
@@ -24,7 +44,7 @@ List<Map<String, dynamic>> _readTags(List<String> paths) {
       final genre = m.genres.map((g) => g.trim()).where((g) => g.isNotEmpty).join(', ');
       t = Track(
         path: path,
-        title: title.isNotEmpty ? title : t.title,
+        title: cleanTitle(title.isNotEmpty ? title : t.title),
         artist: artist.isNotEmpty ? artist : t.artist,
         album: album.isNotEmpty ? album : kUnknownAlbum,
         genre: genre.isNotEmpty ? _normalizeGenre(genre) : kUnknownGenre,
@@ -35,6 +55,7 @@ List<Map<String, dynamic>> _readTags(List<String> paths) {
     } catch (_) {
       // Formato senza tag leggibili: si usa il nome del file.
     }
+    if (t.title != cleanTitle(t.title)) t = t.copyWith(title: cleanTitle(t.title));
     out.add(t.toJson());
   }
   return out;
@@ -112,7 +133,11 @@ class Library extends ChangeNotifier {
       final f = await _cacheFile();
       if (await f.exists()) {
         final list = jsonDecode(await f.readAsString()) as List;
-        _set(list.map((e) => Track.fromJson(e as Map<String, dynamic>)).toList());
+        _set(list.map((e) {
+          final t = Track.fromJson(e as Map<String, dynamic>);
+          final c = cleanTitle(t.title);
+          return c == t.title ? t : t.copyWith(title: c);
+        }).toList());
       }
     } catch (_) {}
   }
@@ -182,7 +207,7 @@ class Library extends ChangeNotifier {
       final chunk = toRead.sublist(i, (i + batch).clamp(0, toRead.length));
       scanStatus = 'Leggo le informazioni: ${i + chunk.length} di ${toRead.length}';
       notifyListeners();
-      final maps = await Isolate.run(() => _readTags(chunk));
+      final maps = await _readTagsAsync(chunk);
       result.addAll(maps.map(Track.fromJson));
     }
 
@@ -198,14 +223,25 @@ class Library extends ChangeNotifier {
     final audio = paths.where(isAudioFile).toList();
     final newPaths = audio.where((x) => !_byPath.containsKey(x)).toList();
     if (newPaths.isNotEmpty) {
-      final maps = await Isolate.run(() => _readTags(newPaths));
+      final maps = await _readTagsAsync(newPaths);
       _set([...tracks, ...maps.map(Track.fromJson)]);
       await _saveCache();
     }
     return audio.map(trackFor).toList();
   }
 
-  static Future<Uint8List?> cover(String path) => Isolate.run(() => _readCover(path));
+  static Future<Uint8List?> cover(String path) => _readCoverAsync(path);
+
+  /// Salva le modifiche fatte a mano (artista, genere, album, titolo).
+  Future<void> updateTracks(List<Track> updated) async {
+    for (final t in updated) {
+      _byPath[t.path] = t;
+    }
+    tracks = _byPath.values.toList();
+    _sortTracks();
+    notifyListeners();
+    await _saveCache();
+  }
 
   /// Restituisce i gruppi (nome -> brani) per il catalogo scelto.
   Map<String, List<Track>> groups(Catalog c) {

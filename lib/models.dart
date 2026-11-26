@@ -55,6 +55,17 @@ class Track {
     return Track(path: path, title: name);
   }
 
+  Track copyWith({String? title, String? artist, String? album, String? genre, int? year}) => Track(
+        path: path,
+        title: title ?? this.title,
+        artist: artist ?? this.artist,
+        album: album ?? this.album,
+        genre: genre ?? this.genre,
+        year: year ?? this.year,
+        trackNumber: trackNumber,
+        durationMs: durationMs,
+      );
+
   Map<String, dynamic> toJson() => {
         'p': path,
         't': title,

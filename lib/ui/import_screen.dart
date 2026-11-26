@@ -99,6 +99,24 @@ class _ImportScreenState extends State<ImportScreen> {
               ),
             ),
 
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Wrap(spacing: 12, runSpacing: 12, children: [
+              FilledButton.icon(
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18)),
+                onPressed: _chooseFolder,
+                icon: const Icon(Icons.folder_open),
+                label: const Text('Scegli la cartella da importare'),
+              ),
+              FilledButton.tonalIcon(
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18)),
+                onPressed: _chooseFiles,
+                icon: const Icon(Icons.audio_file),
+                label: const Text('Scegli singoli brani'),
+              ),
+            ]),
+          ),
+
           // ---- Chiavetta USB ----
           _Section(Platform.isAndroid ? 'Da chiavetta USB (OTG)' : 'Da chiavetta USB o disco esterno', Icons.usb),
           FutureBuilder<List<Volume>>(
@@ -365,7 +383,7 @@ class ImportFilesScreen extends StatefulWidget {
 class _ImportFilesScreenState extends State<ImportFilesScreen> {
   List<String>? files;
   final selected = <String>{};
-  bool makePlaylist = false;
+  bool makePlaylist = true;
   late final TextEditingController _plName =
       TextEditingController(text: widget.playlistName ?? widget.title);
 
@@ -424,29 +442,45 @@ class _ImportFilesScreenState extends State<ImportFilesScreen> {
       ),
     );
 
-    // Su chiavetta si conservano le sottocartelle sotto il nome della chiavetta/cartella.
-    final sub = widget.sourceDir != null ? _safeName(widget.title) : (widget.fromBluetooth ? 'Bluetooth' : null);
-    final result = await Importer.copyFiles(
-      list,
-      baseDir: widget.sourceDir,
-      subfolder: sub,
-      onProgress: (d, t, c) => progress.value = (d, t, c),
-      isCancelled: () => cancelled,
-    );
-
-    await app.ensureImportFolderInLibrary();
-    await app.library.addFiles(result.copied);
-    if (widget.fromBluetooth) {
-      await app.settings.markBtImported(list.take(result.copied.length + result.failed));
-    }
-    if (makePlaylist && result.copied.isNotEmpty) {
-      app.playlists.create(_plName.text, result.copied);
+    ImportResult result = const ImportResult([], 0, 0, false);
+    String? error;
+    try {
+      // Su chiavetta si conservano le sottocartelle sotto il nome della chiavetta/cartella.
+      final sub = widget.sourceDir != null ? _safeName(widget.title) : (widget.fromBluetooth ? 'Bluetooth' : null);
+      result = await Importer.copyFiles(
+        list,
+        baseDir: widget.sourceDir,
+        subfolder: sub,
+        onProgress: (d, t, c) => progress.value = (d, t, c),
+        isCancelled: () => cancelled,
+      );
+      progress.value = (list.length, list.length, 'Aggiorno la libreria...');
+      await app.ensureImportFolderInLibrary();
+      await app.library.addFiles(result.copied);
+      if (widget.fromBluetooth) {
+        await app.settings.markBtImported(list.take(result.copied.length + result.failed));
+      }
+      if (makePlaylist && result.copied.isNotEmpty) {
+        final name = _plName.text.trim().isEmpty ? widget.title : _plName.text.trim();
+        final existing = app.playlists.items.where((x) => x.name == name).firstOrNull;
+        if (existing != null) {
+          app.playlists.addTracks(existing, result.copied);
+        } else {
+          app.playlists.create(name, result.copied);
+        }
+      }
+    } catch (e) {
+      error = '$e';
     }
 
     if (!mounted) return;
     Navigator.of(context).pop(); // chiude la finestra di avanzamento
     final newOnes = result.copied.length - result.skipped;
-    final msg = StringBuffer(result.cancelled ? 'Importazione interrotta. ' : 'Importazione completata. ')
+    final msg = StringBuffer(error != null
+        ? 'Si è verificato un problema: $error\n\n'
+        : result.cancelled
+            ? 'Importazione interrotta. '
+            : 'Importazione completata. ')
       ..write('$newOnes brani copiati');
     if (result.skipped > 0) msg.write(', ${result.skipped} erano già presenti');
     if (result.failed > 0) msg.write(', ${result.failed} non copiati');
@@ -454,8 +488,8 @@ class _ImportFilesScreenState extends State<ImportFilesScreen> {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: Icon(result.failed == 0 ? Icons.check_circle : Icons.warning_amber, size: 48),
-        title: const Text('Fatto'),
+        icon: Icon(result.failed == 0 && error == null ? Icons.check_circle : Icons.warning_amber, size: 48),
+        title: Text(error == null ? 'Fatto' : 'Attenzione'),
         content: Text('$msg.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
@@ -481,7 +515,22 @@ class _ImportFilesScreenState extends State<ImportFilesScreen> {
   Widget build(BuildContext context) {
     final list = files;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(title: Text(widget.title), actions: [
+        if (widget.sourceDir != null)
+          TextButton.icon(
+            onPressed: () async {
+              final dir = await FilePicker.platform.getDirectoryPath(
+                dialogTitle: 'Scegli la cartella da importare',
+              );
+              if (dir == null || !context.mounted) return;
+              Navigator.of(context).pushReplacement(MaterialPageRoute(
+                builder: (_) => ImportFilesScreen(title: p.basename(dir), sourceDir: dir),
+              ));
+            },
+            icon: const Icon(Icons.folder_open),
+            label: const Text('Scegli un\'altra cartella'),
+          ),
+      ]),
       body: list == null
           ? const Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
