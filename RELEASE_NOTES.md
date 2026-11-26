@@ -13,4 +13,5 @@ Lettore musicale semplice con playlist, equalizzatore e collegamento Bluetooth a
 - Playlist salvabili: crea, rinomina, riordina, ordina, importa ed esporta (M3U), salva la coda
 - Equalizzatore a 10 bande con impostazioni pronte, velocità, timer di spegnimento, ReplayGain, gapless
 - Riprende da dove avevi lasciato
+- **Importa brani** (pulsante con la freccia in alto): da chiavetta USB/OTG o disco esterno, dal PC via Bluetooth o con cavo USB, da cartelle o singoli file. I brani vengono copiati nella cartella Musica → SirJoe Player, con la possibilità di creare subito una playlist
 - **Bluetooth**: sceglie il dispositivo predefinito e all'avvio si collega da solo, oppure chiede prima. Tutto modificabile nelle Impostazioni.

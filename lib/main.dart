@@ -6,9 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart' hide Track;
 
 import 'app_state.dart';
+import 'importer.dart';
 import 'audio_handler.dart';
 import 'settings.dart';
 import 'ui/common.dart';
+import 'ui/import_screen.dart';
 import 'ui/library_screen.dart';
 import 'ui/now_playing.dart';
 import 'ui/playlists_screen.dart';
@@ -85,6 +87,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await app.firstRunSetup();
       await _startupBluetooth();
+      // Lascia leggere il messaggio del Bluetooth prima di avvisare dei brani ricevuti.
+      await Future.delayed(const Duration(seconds: 6));
+      await _checkBluetoothReceived();
     });
   }
 
@@ -101,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     if (state == AppLifecycleState.resumed) {
       app.bt.refresh(app.settings.btDeviceId);
+      _checkBluetoothReceived();
     }
   }
 
@@ -173,6 +179,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 }
               },
             ),
+    );
+  }
+
+  /// Android: avvisa se sono arrivati brani via Bluetooth dal PC.
+  int _lastBtReceivedCount = 0;
+  Future<void> _checkBluetoothReceived() async {
+    if (!Platform.isAndroid) return;
+    final files = await Importer.bluetoothReceived(app.settings.btImported);
+    if (!mounted || files.isEmpty || files.length == _lastBtReceivedCount) return;
+    _lastBtReceivedCount = files.length;
+    toast(
+      context,
+      'Hai ricevuto ${files.length} brani via Bluetooth',
+      action: SnackBarAction(
+        label: 'Importa',
+        onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ImportFilesScreen(
+            title: 'Ricevuti via Bluetooth',
+            files: files,
+            fromBluetooth: true,
+            playlistName: 'Ricevuti via Bluetooth',
+          ),
+        )),
+      ),
     );
   }
 
@@ -255,6 +285,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Flexible(child: Text('SirJoe Player · ${titles[tab]}', overflow: TextOverflow.ellipsis)),
             ]),
             actions: [
+              IconButton(
+                tooltip: 'Importa brani',
+                icon: const Icon(Icons.download),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ImportScreen())),
+              ),
               ConstrainedBox(constraints: const BoxConstraints(maxWidth: 220), child: _btButton()),
               const SizedBox(width: 8),
             ],
