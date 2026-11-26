@@ -106,9 +106,9 @@ public static class SJBT {
     BLUETOOTH_DEVICE_INFO d;
     if (!Find(a, out d)) return false;
     if (d.fConnected) return true;
+    // Solo il profilo musicale A2DP: il profilo "vivavoce" peggiora l'audio e lo fa scattare.
     Guid[] services = {
-      new Guid("0000110b-0000-1000-8000-00805f9b34fb"), // AudioSink (A2DP)
-      new Guid("0000111e-0000-1000-8000-00805f9b34fb")  // Handsfree
+      new Guid("0000110b-0000-1000-8000-00805f9b34fb") // AudioSink (A2DP)
     };
     // Disattiva e riattiva i servizi audio: Windows ricollega il dispositivo.
     foreach (var s in services) { var g = s; BluetoothSetServiceState(IntPtr.Zero, ref d, ref g, 0); }
