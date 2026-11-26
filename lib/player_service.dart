@@ -7,7 +7,7 @@ import 'library.dart';
 import 'models.dart';
 import 'settings.dart';
 
-enum RepeatMode { off, all, one }
+enum PlayRepeat { off, all, one }
 
 class PlayerService extends ChangeNotifier {
   final Settings settings;
@@ -25,7 +25,7 @@ class PlayerService extends ChangeNotifier {
   List<String> queue = [];
   int index = -1;
   bool shuffle = false;
-  RepeatMode repeat = RepeatMode.off;
+  PlayRepeat repeat = PlayRepeat.off;
   DateTime? sleepAt;
   Timer? _sleepTimer;
   Timer? _saveTimer;
@@ -198,11 +198,11 @@ class PlayerService extends ChangeNotifier {
   Future<void> toggleShuffle() => player.setShuffle(!shuffle);
 
   Future<void> cycleRepeat() async {
-    repeat = RepeatMode.values[(repeat.index + 1) % RepeatMode.values.length];
+    repeat = PlayRepeat.values[(repeat.index + 1) % PlayRepeat.values.length];
     await player.setPlaylistMode(switch (repeat) {
-      RepeatMode.off => PlaylistMode.none,
-      RepeatMode.all => PlaylistMode.loop,
-      RepeatMode.one => PlaylistMode.single,
+      PlayRepeat.off => PlaylistMode.none,
+      PlayRepeat.all => PlaylistMode.loop,
+      PlayRepeat.one => PlaylistMode.single,
     });
     notifyListeners();
   }
