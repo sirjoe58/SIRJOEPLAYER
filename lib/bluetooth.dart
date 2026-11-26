@@ -306,6 +306,9 @@ class BluetoothService extends ChangeNotifier {
 
   bool get supported => backend != null;
 
+  /// Chiamato dopo un collegamento riuscito (per far ripartire l'uscita audio).
+  Future<void> Function()? onConnected;
+
   Future<List<BtDevice>> pairedDevices() async {
     final b = backend;
     if (b == null) return [];
@@ -364,6 +367,9 @@ class BluetoothService extends ChangeNotifier {
         if (await b.connect(id)) {
           deviceConnected = true;
           _set('Collegato a $name', busy: false);
+          // Il sistema ha appena cambiato l'uscita audio: si riallinea il player.
+          await Future.delayed(const Duration(seconds: 2));
+          await onConnected?.call();
           return BtResult(true, 'Collegato a $name');
         }
         await Future.delayed(const Duration(seconds: 4));
