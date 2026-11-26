@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -41,6 +42,11 @@ class MainActivity : AudioServiceActivity() {
                         "paired" -> result.success(paired())
                         "isConnected" -> result.success(isConnected(call.argument<String>("id") ?: ""))
                         "connect" -> connect(call.argument<String>("id") ?: "", result)
+                        "scanFiles" -> {
+                            val paths = call.argument<List<String>>("paths") ?: emptyList()
+                            MediaScannerConnection.scanFile(this, paths.toTypedArray(), null, null)
+                            result.success(true)
+                        }
                         "openSettings" -> {
                             startActivity(
                                 Intent(Settings.ACTION_BLUETOOTH_SETTINGS)

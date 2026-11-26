@@ -55,6 +55,9 @@ class Settings extends ChangeNotifier {
   // Aspetto
   bool largeText = true;
 
+  // Brani ricevuti via Bluetooth già importati (Android)
+  Set<String> btImported = {};
+
   // Ultima riproduzione
   List<String> lastQueue = [];
   int lastIndex = 0;
@@ -80,6 +83,7 @@ class Settings extends ChangeNotifier {
     gapless = _p.getBool('gapless') ?? true;
     resumeLast = _p.getBool('resumeLast') ?? true;
     largeText = _p.getBool('largeText') ?? true;
+    btImported = (_p.getStringList('btImported') ?? []).toSet();
     lastQueue = _p.getStringList('lastQueue') ?? [];
     lastIndex = _p.getInt('lastIndex') ?? 0;
     lastPositionMs = _p.getInt('lastPositionMs') ?? 0;
@@ -115,6 +119,11 @@ class Settings extends ChangeNotifier {
     await _p.setStringList('lastQueue', queue);
     await _p.setInt('lastIndex', index);
     await _p.setInt('lastPositionMs', positionMs);
+  }
+
+  Future<void> markBtImported(Iterable<String> paths) async {
+    btImported.addAll(paths);
+    await _p.setStringList('btImported', btImported.toList());
   }
 
   void update(void Function(Settings s) change) {

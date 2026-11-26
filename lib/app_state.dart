@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'bluetooth.dart';
+import 'importer.dart';
 import 'library.dart';
 import 'models.dart';
 import 'player_service.dart';
@@ -39,6 +40,15 @@ class AppState {
     settings.folders = existing;
     await settings.save();
     await library.scan(settings.folders);
+  }
+
+  /// La cartella dei brani importati fa sempre parte della libreria.
+  Future<void> ensureImportFolderInLibrary() async {
+    final dest = await Importer.destinationDir();
+    if (!settings.folders.contains(dest)) {
+      settings.folders = [...settings.folders, dest];
+      await settings.save();
+    }
   }
 
   Future<bool> addFolder() async {

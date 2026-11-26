@@ -4,6 +4,7 @@ import '../app_state.dart';
 import '../library.dart';
 import '../models.dart';
 import 'common.dart';
+import 'import_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -170,6 +171,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
               onPressed: () => app.addFolder(),
               icon: const Icon(Icons.create_new_folder),
               label: const Text('Aggiungi cartella di musica'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18)),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ImportScreen())),
+              icon: const Icon(Icons.download),
+              label: const Text('Importa brani (chiavetta, PC, Bluetooth)'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(

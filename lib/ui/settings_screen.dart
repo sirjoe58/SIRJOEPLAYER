@@ -7,6 +7,7 @@ import '../bluetooth.dart';
 import '../models.dart';
 import '../settings.dart';
 import 'common.dart';
+import 'import_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -116,6 +117,11 @@ class SettingsScreen extends StatelessWidget {
                   icon: const Icon(Icons.create_new_folder),
                   label: const Text('Aggiungi cartella'),
                 ),
+                FilledButton.tonalIcon(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ImportScreen())),
+                  icon: const Icon(Icons.download),
+                  label: const Text('Importa brani'),
+                ),
                 OutlinedButton.icon(
                   onPressed: app.library.scanning ? null : () => app.library.scan(s.folders),
                   icon: const Icon(Icons.refresh),
@@ -184,7 +190,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             const _Header('Informazioni', Icons.info_outline),
             const ListTile(
-              title: Text('SirJoe Player 1.0.0'),
+              title: Text('SirJoe Player 1.0.1'),
               subtitle: Text('Lettore musicale con playlist, equalizzatore e Bluetooth automatico'),
             ),
             ListTile(
