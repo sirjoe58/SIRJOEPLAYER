@@ -120,12 +120,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         IconButton(
                           iconSize: 30,
                           tooltip: switch (ps.repeat) {
-                            RepeatMode.off => 'Ripeti: no',
-                            RepeatMode.all => 'Ripeti: tutti',
-                            RepeatMode.one => 'Ripeti: questo brano',
+                            PlayRepeat.off => 'Ripeti: no',
+                            PlayRepeat.all => 'Ripeti: tutti',
+                            PlayRepeat.one => 'Ripeti: questo brano',
                           },
-                          color: ps.repeat != RepeatMode.off ? scheme.primary : null,
-                          icon: Icon(ps.repeat == RepeatMode.one ? Icons.repeat_one : Icons.repeat),
+                          color: ps.repeat != PlayRepeat.off ? scheme.primary : null,
+                          icon: Icon(ps.repeat == PlayRepeat.one ? Icons.repeat_one : Icons.repeat),
                           onPressed: ps.cycleRepeat,
                         ),
                       ],
