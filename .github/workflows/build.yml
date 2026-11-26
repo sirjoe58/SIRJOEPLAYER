@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths-ignore: ['**.md']
   workflow_dispatch:
+    inputs:
+      mac:
+        description: 'Compila anche per Mac'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -98,8 +103,11 @@ jobs:
           V: ${{ needs.prepare.outputs.version }}
         run: gh release upload "v$V" dist/* --repo "$GITHUB_REPOSITORY" --clobber
 
+  # Il Mac si compila solo su richiesta: "[mac]" nel messaggio del commit
+  # oppure avvio manuale con l'opzione "Compila anche per Mac".
   macos:
     needs: prepare
+    if: contains(github.event.head_commit.message, '[mac]') || (github.event_name == 'workflow_dispatch' && inputs.mac)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
