@@ -2,7 +2,8 @@ name: Compila SirJoe Player
 
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths-ignore: ['**.md']
   workflow_dispatch:
 
 permissions:
@@ -115,11 +116,15 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Versione
+        run: echo "APP_VERSION=$(bash tool/version.sh)" >> $GITHUB_ENV
       - name: Pubblica la Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
-          name: SirJoe Player ${{ github.ref_type == 'tag' && github.ref_name || format('build {0}', github.run_number) }}
+          tag_name: v${{ env.APP_VERSION }}
+          name: SirJoe Player ${{ env.APP_VERSION }}
+          target_commitish: ${{ github.sha }}
+          overwrite_files: true
           body_path: RELEASE_NOTES.md
           files: dist/*
       - name: Tiene solo le ultime 2 versioni
