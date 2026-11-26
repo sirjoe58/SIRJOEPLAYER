@@ -12,8 +12,30 @@ permissions:
 env:
   FLUTTER_CHANNEL: stable
 
+concurrency:
+  group: build
+  cancel-in-progress: true
+
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: echo "version=$(bash tool/version.sh)" >> $GITHUB_OUTPUT
+      - name: Crea la Release (se non esiste)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+          gh release create "v$V" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "SirJoe Player $V" --notes-file RELEASE_NOTES.md
+
   android:
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,12 +58,15 @@ jobs:
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk dist/SirJoePlayer-Android-universale.apk
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/SirJoePlayer-Android-arm64.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android
-          path: dist/*
+      - name: Carica nella Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ needs.prepare.outputs.version }}
+        run: gh release upload "v$V" dist/* --repo "$GITHUB_REPOSITORY" --clobber
 
   windows:
+    needs: prepare
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,13 +91,16 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
           & $iscc installer\windows.iss
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath dist\SirJoePlayer-Windows-portatile.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: dist/*
+      - name: Carica nella Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ needs.prepare.outputs.version }}
+        run: gh release upload "v$V" dist/* --repo "$GITHUB_REPOSITORY" --clobber
 
   macos:
-    runs-on: macos-14
+    needs: prepare
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -102,31 +130,18 @@ jobs:
           cp -R "build/macos/Build/Products/Release/SirJoe Player.app" /tmp/dmg/
           ln -s /Applications /tmp/dmg/Applicazioni
           hdiutil create -volname "SirJoe Player" -srcfolder /tmp/dmg -ov -format UDZO dist/SirJoePlayer-Mac.dmg
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos
-          path: dist/*
+      - name: Carica nella Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ needs.prepare.outputs.version }}
+        run: gh release upload "v$V" dist/* --repo "$GITHUB_REPOSITORY" --clobber
 
-  release:
+  cleanup:
     needs: [android, windows, macos]
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-      - name: Versione
-        run: echo "APP_VERSION=$(bash tool/version.sh)" >> $GITHUB_ENV
-      - name: Pubblica la Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.APP_VERSION }}
-          name: SirJoe Player ${{ env.APP_VERSION }}
-          target_commitish: ${{ github.sha }}
-          overwrite_files: true
-          body_path: RELEASE_NOTES.md
-          files: dist/*
       - name: Tiene solo le ultime 2 versioni
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
