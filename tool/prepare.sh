@@ -23,6 +23,26 @@ case "$PLATFORM" in
       /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'SirJoe Player'" "$PL"
     ;;
   android)
+    # Alcuni plugin compilano con un SDK Android vecchio: si forza la versione 36.
+    if [[ -f android/build.gradle.kts ]]; then
+      cat >> android/build.gradle.kts <<'EOF'
+
+subprojects {
+    val forceSdk: Project.() -> Unit = {
+        extensions.findByName("android")?.withGroovyBuilder { "compileSdkVersion"(36) }
+    }
+    if (state.executed) forceSdk() else afterEvaluate { forceSdk() }
+}
+EOF
+    else
+      cat >> android/build.gradle <<'EOF'
+
+subprojects {
+    def forceSdk = { p -> if (p.extensions.findByName("android") != null) { p.android.compileSdkVersion 36 } }
+    if (project.state.executed) { forceSdk(project) } else { afterEvaluate { forceSdk(project) } }
+}
+EOF
+    fi
     ;;
 esac
 
