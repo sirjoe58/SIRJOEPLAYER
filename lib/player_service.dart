@@ -51,8 +51,10 @@ class PlayerService extends ChangeNotifier {
       notifyListeners();
     }));
     _subs.add(player.stream.position.listen((v) {
+      final changed = (v - position).abs() >= const Duration(milliseconds: 250) || v < position;
       position = v;
-      notifyListeners();
+      // Aggiorna lo schermo al massimo 4 volte al secondo (meno lavoro per il computer).
+      if (changed) notifyListeners();
     }));
     _subs.add(player.stream.duration.listen((v) {
       duration = v;
@@ -221,6 +223,10 @@ class PlayerService extends ChangeNotifier {
       await n.setProperty('replaygain-clip', 'no');
       await n.setProperty('gapless-audio', settings.gapless ? 'yes' : 'weak');
       await n.setProperty('audio-pitch-correction', 'yes');
+      // Buffer audio più ampio: evita gli scatti con cuffie e casse Bluetooth.
+      await n.setProperty('audio-buffer', '1.0');
+      // Tiene "sveglio" il dispositivo Bluetooth tra un brano e l'altro.
+      await n.setProperty('audio-stream-silence', 'yes');
     } catch (_) {}
   }
 
@@ -279,21 +285,21 @@ class PlayerService extends ChangeNotifier {
       _repairStep = 0;
       return;
     }
-    if (position != _lastPos) {
-      _lastPos = position;
+    final pos = player.state.position;
+    if (pos != _lastPos) {
+      _lastPos = pos;
       _stuckTicks = 0;
       _repairStep = 0;
       return;
     }
     _stuckTicks++;
-    if (_stuckTicks < 2) return; // fermo da circa 4 secondi
+    if (_stuckTicks < 3) return; // fermo da circa 6 secondi
     _stuckTicks = 0;
     final at = position;
     switch (_repairStep++) {
       case 0:
         // 1) Riavvia l'uscita audio (dispositivo Bluetooth cambiato o scollegato).
         await reloadAudioOutput();
-        await player.seek(at);
       case 1:
         // 2) Se l'equalizzatore blocca l'audio, lo disattiva.
         if (settings.eqEnabled) {

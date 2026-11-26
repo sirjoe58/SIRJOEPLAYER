@@ -1,7 +1,7 @@
 name: sirjoe_player
 description: SirJoe Player - lettore musicale semplice e completo con Bluetooth automatico.
 publish_to: 'none'
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: ">=3.6.0 <4.0.0"

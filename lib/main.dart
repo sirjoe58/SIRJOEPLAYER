@@ -107,7 +107,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       app.player.saveState();
     }
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && Platform.isAndroid) {
+      // Su PC non si interroga il Bluetooth a ogni cambio di finestra: disturba l'audio.
       app.bt.refresh(app.settings.btDeviceId);
       _checkBluetoothReceived();
     }
