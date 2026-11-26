@@ -1,0 +1,133 @@
+name: Compila SirJoe Player
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_CHANNEL: stable
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - name: Prepara progetto
+        run: bash tool/prepare.sh android
+      - name: Versione
+        run: echo "APP_VERSION=$(bash tool/version.sh)" >> $GITHUB_ENV
+      - name: Compila APK
+        run: |
+          flutter build apk --release --build-name=$APP_VERSION
+          flutter build apk --release --split-per-abi --target-platform android-arm64 --build-name=$APP_VERSION
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/SirJoePlayer-Android-universale.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/SirJoePlayer-Android-arm64.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - name: Prepara progetto
+        shell: bash
+        run: bash tool/prepare.sh windows
+      - name: Versione
+        shell: bash
+        run: echo "APP_VERSION=$(bash tool/version.sh)" >> $GITHUB_ENV
+      - name: Compila
+        shell: bash
+        run: flutter build windows --release --build-name=$APP_VERSION
+      - name: Installer e versione portatile
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          & $iscc installer\windows.iss
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath dist\SirJoePlayer-Windows-portatile.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - name: Prepara progetto
+        run: bash tool/prepare.sh macos
+      - name: Versione
+        run: echo "APP_VERSION=$(bash tool/version.sh)" >> $GITHUB_ENV
+      - name: Compila
+        run: flutter build macos --release --build-name=$APP_VERSION
+      - name: Aggiunge blueutil (gestione Bluetooth)
+        run: |
+          git clone --depth 1 https://github.com/toy/blueutil.git /tmp/blueutil
+          clang -mmacosx-version-min=10.14 -arch arm64 -arch x86_64 \
+            -framework Foundation -framework IOBluetooth \
+            -o /tmp/blueutil/blueutil /tmp/blueutil/blueutil.m
+          APP="build/macos/Build/Products/Release/SirJoe Player.app"
+          cp /tmp/blueutil/blueutil "$APP/Contents/Resources/blueutil"
+          cp /tmp/blueutil/LICENSE.txt "$APP/Contents/Resources/blueutil-LICENSE.txt"
+          chmod +x "$APP/Contents/Resources/blueutil"
+          codesign --force --deep --sign - "$APP"
+      - name: Crea DMG
+        run: |
+          mkdir -p dist /tmp/dmg
+          cp -R "build/macos/Build/Products/Release/SirJoe Player.app" /tmp/dmg/
+          ln -s /Applications /tmp/dmg/Applicazioni
+          hdiutil create -volname "SirJoe Player" -srcfolder /tmp/dmg -ov -format UDZO dist/SirJoePlayer-Mac.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*
+
+  release:
+    needs: [android, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Pubblica la Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+          name: SirJoe Player ${{ github.ref_type == 'tag' && github.ref_name || format('build {0}', github.run_number) }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*
+      - name: Tiene solo le ultime 2 versioni
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[2:] | .[].tagName' | while read -r tag; do
+            echo "Elimino la vecchia versione $tag"
+            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          done
