@@ -1,4 +1,4 @@
-name: Compila SirJoe Player
+name: Compila SirJoe Player (Windows e Android)
 
 on:
   push:
